@@ -1,0 +1,61 @@
+name: Acceptance stage
+
+on:
+  workflow_call:
+    # Map the workflow outputs to job outputs
+    inputs:
+      triggering-sha:
+        required: true
+        type: string
+  workflow_dispatch: ~
+
+env:
+      MIX_ENV: test
+
+jobs:
+  acceptance-test:
+    name: Acceptance test
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        include:
+          - elixir: 1.18.2
+            otp: 27.2.4
+      fail-fast: false
+    steps:
+      - name: Checkout on SHA-${{ inputs.triggering-sha }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.triggering-sha }}
+      
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
+      
+      - name: Restore deps and _build cache
+        uses: actions/cache@v4
+        id: mix-cache
+        with:
+          path: |
+            deps
+            _build
+          key: deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}
+
+      - name: Install dependencies
+        if: steps.mix-cache.outputs.cache-hit != 'true'
+        run: |
+          mix local.rebar --force
+          mix local.hex --force
+          mix deps.get
+          mix deps.compile
+      
+      - name: Compile & lint dependencies
+        run: mix compile --warnings-as-errors
+      
+      - name: Run acceptance test
+        run: mix test --only acceptance_test

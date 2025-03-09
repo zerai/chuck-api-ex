@@ -1,0 +1,162 @@
+name: Commit stage
+
+on:
+  workflow_call:
+    # Map the workflow outputs to job outputs
+    inputs:
+      triggering-sha:
+        required: true
+        type: string
+  workflow_dispatch: ~
+
+env:
+      MIX_ENV: test
+
+jobs:
+  commit-checks:
+    name: Commit checks
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        include:
+          - elixir: 1.18.2
+            otp: 27.2.4
+            lint: true
+      fail-fast: false
+    steps:
+      - name: Checkout on SHA-${{ inputs.triggering-sha }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.triggering-sha }}
+      
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
+      
+      - name: Restore deps and _build cache
+        uses: actions/cache@v4
+        id: mix-cache
+        with:
+          path: |
+            deps
+            build
+          key: deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}
+
+      - name: Install dependencies
+        if: steps.mix-cache.outputs.cache-hit != 'true'
+        run: |
+          mix local.rebar --force
+          mix local.hex --force
+          mix deps.get
+          mix deps.compile
+      
+      - name: Check for unused deps
+        run: mix deps.unlock --check-unused
+      
+      - name: Compile & lint dependencies
+        if: always()
+        run: mix compile --warnings-as-errors
+      
+      - name: Dependecies vulnerability audit
+        if: always()
+        run: mix deps.audit
+      
+      - name: Check for Hex dependencies that have been marked as retired
+        if: always()
+        run: mix hex.audit
+
+      - name: Check Formatting
+        if: always()
+        run: mix format --check-formatted
+
+      - name: Check SA (credo)
+        if: always()
+        run: mix credo
+      
+      # # Cache key based on Erlang/Elixir version and the mix.lock hash
+      # - name: Restore PLT cache
+      #   id: plt_cache
+      #   uses: actions/cache/restore@v3
+      #   with:
+      #     key: |
+      #       plt-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+      #     restore-keys: |
+      #       plt-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
+      #     path: |
+      #       priv/plts
+      
+      # # Create PLTs if no cache was found
+      # - name: Create PLTs
+      #   if: steps.plt_cache.outputs.cache-hit != 'true'
+      #   run: MIX_ENV=dev mix dialyzer --plt
+      
+      # # By default, the GitHub Cache action will only save the cache if all steps in the job succeed,
+      # # so we separate the cache restore and save steps in case running dialyzer fails.
+      # - name: Save PLT cache
+      #   id: plt_cache_save
+      #   uses: actions/cache/save@v3
+      #   if: steps.plt_cache.outputs.cache-hit != 'true'
+      #   with:
+      #     key: |
+      #       plt-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+      #     path: |
+      #       priv/plts
+      
+      # - name: Run dialyzer
+      #   # Two formats are included for ease of debugging and it is lightly recommended to use both, see https://github.com/jeremyjh/dialyxir/issues/530 for reasoning
+      #   # --format github is helpful to print the warnings in a way that GitHub understands and can place on the /files page of a PR
+      #   # --format dialyxir allows the raw GitHub actions logs to be useful because they have the full warning printed
+      #   run: MIX_ENV=dev mix dialyzer --format github --format dialyxir
+
+
+  unit-test:
+    name: Unit test
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        include:
+          - elixir: 1.18.2
+            otp: 27.2.4
+      fail-fast: false
+    steps:
+      - name: Checkout on SHA-${{ inputs.triggering-sha }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.triggering-sha }}
+      
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
+      
+      - name: Restore deps and _build cache
+        uses: actions/cache@v4
+        id: mix-cache
+        with:
+          path: |
+            deps
+            _build
+          key: deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}
+
+      - name: Install dependencies
+        if: steps.mix-cache.outputs.cache-hit != 'true'
+        run: |
+          mix local.rebar --force
+          mix local.hex --force
+          mix deps.get
+          mix deps.compile
+      
+      - name: Compile & lint dependencies
+        run: mix compile --warnings-as-errors
+      
+      - name: Run unit test
+        run: mix test --only unit_test
