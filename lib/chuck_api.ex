@@ -16,16 +16,28 @@ defmodule ChuckApi do
     :world
   end
 
+  @spec get_random_joke() :: {:error, {:status, integer()} | HTTPoison.Error.t()} | {:ok, any()}
   @doc """
-  Get random joke.
+  Retrieve a random chuck joke.
+
+  ## Examples
+
+      iex> ChuckApi.get_random_joke()
 
   """
-  def get_random_joke() do
+  def get_random_joke do
     url = "https://api.chucknorris.io/jokes/random"
+    headers = [Accept: "Application/json; Charset=utf-8"]
 
-    response =
-      HTTPoison.get!(url)
+    case HTTPoison.get(url, headers) do
+      {:ok, %HTTPoison.Response{status_code: 200} = response} ->
+        {:ok, Jason.decode!(response.body)}
 
-    Poison.decode!(response.body)
+      {:ok, %HTTPoison.Response{status_code: status_code}} ->
+        {:error, {:status, status_code}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 end
