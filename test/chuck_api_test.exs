@@ -15,4 +15,9 @@ defmodule ChuckApiTest do
   test "should run on acceptance-stage workflow" do
     assert ChuckApi.hello() == :world
   end
+
+  @tag :acceptance_test
+  test "success: get random joke by category" do
+    assert {:ok, _} = ChuckApi.get_random_joke_by_category("dev")
+  end
 end
