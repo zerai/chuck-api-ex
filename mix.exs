@@ -13,8 +13,8 @@ defmodule ChuckApi.MixProject do
       package: package(),
       # Docs
       name: "ChuckApi",
-      source_url: "https://github.com/USER/PROJECT",
-      homepage_url: "http://YOUR_PROJECT_HOMEPAGE",
+      source_url: "https://github.com/zerai/chuck-api-ex",
+      homepage_url: "https://github.com/zerai/chuck-api-ex",
       docs: [
         # The main page in the docs
         main: "ChuckApi",

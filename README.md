@@ -1,6 +1,6 @@
 # ChuckApi
 
-**TODO: Add description**
+**Elixir Client for the Chuck Norris Joke Api.**
 
 ## Installation
 

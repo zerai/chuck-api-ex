@@ -1,4 +1,4 @@
-name: Commit stage
+name: Acceptance stage
 
 on:
   workflow_call:
@@ -57,5 +57,5 @@ jobs:
       - name: Compile & lint dependencies
         run: mix compile --warnings-as-errors
       
-      - name: Run unit test
-        run: mix test
+      - name: Run acceptance test
+        run: mix test --only acceptance_test

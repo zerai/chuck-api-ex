@@ -159,5 +159,4 @@ jobs:
         run: mix compile --warnings-as-errors
       
       - name: Run unit test
-        run: mix test
-        continue-on-error: false
+        run: mix test --only unit_test
