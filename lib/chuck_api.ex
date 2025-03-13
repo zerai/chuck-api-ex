@@ -16,7 +16,7 @@ defmodule ChuckApi do
     :world
   end
 
-  def get_random_joke_by_category(category) do
+  def get_random_joke_by_category(category) when is_binary(category) do
     url = "https://api.chucknorris.io/jokes/random?category=#{category}"
     headers = [Accept: "Application/json; Charset=utf-8"]
 
